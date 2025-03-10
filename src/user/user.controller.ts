@@ -1,19 +1,44 @@
 // users/users.controller.ts
-import { Controller, Post, Body, Get } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  Req,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { UserService } from './user.service';
+import { RegisterUserDto } from './dto/registeruser.dto';
 
 @Controller('user')
 export class UsersController {
   constructor(private userService: UserService) {}
 
-  @Get()
-  getHello(): string {
-    return `hello`;
-  }
-
   @Post('register')
-  async register(@Body() body: { username: string; password: string }) {
-    return this.userService.createUser(body.username, body.password);
+  async register(@Body() body: RegisterUserDto) {
+    console.log('register', body);
+    return this.userService.createUser(body.username, body.password, 'user');
   }
 
+  @Post('login')
+  async login(@Body() body: RegisterUserDto) {
+    console.log('login', body);
+    return this.userService.signIn(body.username, body.password);
+  }
+
+  @Post('validate')
+  async validate(@Req() req: Request) {
+    const authHeader = (req.headers as { authorization?: string }).authorization;
+
+    if (!authHeader) {
+      throw new UnauthorizedException('Authorization header is missing');
+    }
+
+    const [bearer, token] = authHeader.split(' ');
+
+    if (bearer !== 'Bearer' || !token) {
+      throw new UnauthorizedException('Invalid authorization format');
+    }
+    console.log('VALIDATION', token);
+    return this.userService.validateToken(token);
+  }
 }

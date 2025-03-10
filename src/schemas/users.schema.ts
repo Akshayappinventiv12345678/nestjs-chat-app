@@ -9,6 +9,9 @@ export class User extends Document {
   @Prop({ required: true })
   password: string; // Hashed password
 
+  @Prop({ required: true, default: 'user' })
+  role: string; // Hashed password
+
   @Prop({ default: [] })
   rooms: string[]; // List of room IDs
 }
