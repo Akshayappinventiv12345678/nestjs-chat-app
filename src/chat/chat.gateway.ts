@@ -4,8 +4,11 @@ import {
   SubscribeMessage,
   OnGatewayConnection,
   OnGatewayDisconnect,
+  WsException,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
+import { JwtService } from '@nestjs/jwt'; // Import JwtService
+import { UserService } from 'src/user/user.service';
 
 @WebSocketGateway({
   cors: {
@@ -18,10 +21,45 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   private connectedClients: Map<string, Socket> = new Map();
 
-  handleConnection(client: Socket) {
+  constructor(
+    private jwtService: JwtService,
+    private userService: UserService,
+  ) {}
+
+  private extractTokenFromSocket(client: Socket): string | undefined {
+    const authHeader = client.handshake.headers.authorization;
+    if (authHeader && authHeader.split(' ')[0] === 'Bearer') {
+      return authHeader.split(' ')[1];
+    }
+    return undefined;
+  }
+
+  async handleConnection(client: Socket) {
     console.log(`Client connected: ${client.id}`);
-    this.connectedClients.set(client.id, client);
-    this.server.emit('clientConnected', { clientId: client.id }); // Broadcast connection
+    try {
+      const token = this.extractTokenFromSocket(client);
+      if (!token) {
+        throw new WsException('Unauthorized: Token missing');
+      }
+
+      const payload = await this.jwtService.verifyAsync(token);
+      console.log(token,payload);
+
+      const user = await this.userService.findOne(payload.username); // Assuming you have findById
+      if (!user) {
+        throw new WsException('Unauthorized: User not found');
+      }
+
+      client.data.user = user; // Attach user to socket data
+
+      console.log(`Client connected: ${client.id}, User: ${user.username}`);
+      this.connectedClients.set(client.id, client);
+      this.server.emit('clientConnected', { clientId: client.id, username: user.username });
+    } catch (error) {
+      console.error('Connection error:', error);
+      client.emit('exception', { message: error.message });
+      client.disconnect(true); // Disconnect on auth failure
+    }
   }
 
   handleDisconnect(client: Socket) {
@@ -43,16 +81,18 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   @SubscribeMessage('joinRoom')
   handleJoinRoom(client: Socket, room: string): void {
-    console.log(`Client ${client.id} joining room: ${room}`);
+    let username=client.data.user.username;
+    console.log(`Client ${username} joining room: ${room}`);
     client.join(room);
-    this.server.to(room).emit('userJoined', { user: client.id, room }); //Notify room members
+    this.server.to(room).emit('userJoined', { user: username, room }); //Notify room members
   }
 
   @SubscribeMessage('leaveRoom')
   handleLeaveRoom(client: Socket, room: string): void {
-    console.log(`Client ${client.id} leaving room: ${room}`);
+    let username=client.data.user.username;
+    console.log(`Client ${username} leaving room: ${room}`);
     client.leave(room);
-    this.server.to(room).emit('userLeft', { user: client.id, room }); //Notify room members
+    this.server.to(room).emit('userLeft', { user: username, room }); //Notify room members
   }
 
   @SubscribeMessage('roomMessage')
@@ -60,10 +100,12 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     client: Socket,
     payload: { room: string; message: any },
   ): void {
+    let username=client.data.user.username;
     console.log(
-      `Room message from ${client.id} to ${payload.room}:`,
+      `Room message from ${username} to ${payload.room}:`,
       payload.message,
     );
-    this.server.to(payload.room).emit('roomMessage', { sender: client.id, message: payload.message });
+    // add database sync here 
+    this.server.to(payload.room).emit('roomMessage', { sender: username, message: payload.message });
   }
 }
