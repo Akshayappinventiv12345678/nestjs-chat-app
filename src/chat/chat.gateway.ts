@@ -9,6 +9,7 @@ import {
 import { Server, Socket } from 'socket.io';
 import { JwtService } from '@nestjs/jwt'; // Import JwtService
 import { UserService } from 'src/user/user.service';
+import { ChatService } from './chat.service';
 
 @WebSocketGateway({
   cors: {
@@ -22,8 +23,9 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   private connectedClients: Map<string, Socket> = new Map();
 
   constructor(
-    private jwtService: JwtService,
-    private userService: UserService,
+    private readonly jwtService: JwtService,
+    private readonly userService: UserService,
+    private readonly chatService: ChatService,
   ) {}
 
   private extractTokenFromSocket(client: Socket): string | undefined {
@@ -80,8 +82,8 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   @SubscribeMessage('joinRoom')
-  handleJoinRoom(client: Socket, room: string): void {
-    let username=client.data.user.username;
+  handleJoinRoom(client: Socket, room: string) {
+    let username = client.data.user.username;
     console.log(`Client ${username} joining room: ${room}`);
     client.join(room);
     this.server.to(room).emit('userJoined', { user: username, room }); //Notify room members
@@ -96,15 +98,17 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   @SubscribeMessage('roomMessage')
-  handleRoomMessage(
+  async handleRoomMessage(
     client: Socket,
     payload: { room: string; message: any },
-  ): void {
+  ) {
     let username=client.data.user.username;
     console.log(
       `Room message from ${username} to ${payload.room}:`,
       payload.message,
     );
+
+    await this.chatService.addMessageToRoom(payload.room,username,payload.message,"user");
     // add database sync here 
     this.server.to(payload.room).emit('roomMessage', { sender: username, message: payload.message });
   }

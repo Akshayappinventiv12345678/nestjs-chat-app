@@ -8,6 +8,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 // import { DatabaseSyncModule } from './database-sync/database-sync.module';
 import { UsersModule } from './user/user.module';
 import { EventsGateway } from './chat/chat.gateway';
+import { ChatModule } from './chat/chat.module';
 
 const url = `mongodb+srv://akshaymoryani:zW2THvTkUBHpdSSD@cluster0.rueam.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0`;
 
@@ -15,7 +16,7 @@ const url = `mongodb+srv://akshaymoryani:zW2THvTkUBHpdSSD@cluster0.rueam.mongodb
   imports: [
     MongooseModule.forRoot(url),
     // AuthModule,
-    // ChatModule,
+    ChatModule,
     // DatabaseSyncModule,
     UsersModule,
   ],
