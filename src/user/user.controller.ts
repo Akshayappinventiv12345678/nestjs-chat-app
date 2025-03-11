@@ -8,6 +8,8 @@ import {
 } from '@nestjs/common';
 import { UserService } from './user.service';
 import { RegisterUserDto } from './dto/registeruser.dto';
+import { RoomInfoDto } from './dto/roominfo.dto';
+import { retry } from 'rxjs';
 
 @Controller('user')
 export class UsersController {
@@ -40,5 +42,18 @@ export class UsersController {
     }
     console.log('VALIDATION', token);
     return this.userService.validateToken(token);
+  }
+
+  @Post('createroom')
+  async createRoom(@Req() req: Request, @Body() body: RoomInfoDto) {
+    const user = await this.validate(req);
+    if (!user) {
+      throw new UnauthorizedException('Authorised Path');
+    }
+
+    body.admin = user?.username;
+
+    return await this.userService.createRoom(body);
+
   }
 }

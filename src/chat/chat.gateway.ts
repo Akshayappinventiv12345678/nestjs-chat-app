@@ -98,18 +98,12 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   @SubscribeMessage('roomMessage')
-  async handleRoomMessage(
-    client: Socket,
-    payload: { room: string; message: any },
-  ) {
+  async handleRoomMessage(client: Socket,payload: { room: string; message: any }) {
     let username=client.data.user.username;
-    console.log(
-      `Room message from ${username} to ${payload.room}:`,
-      payload.message,
-    );
+    console.log(`Room message from ${username} to ${payload.room}:`, payload.message);
 
-    await this.chatService.addMessageToRoom(payload.room,username,payload.message,"user");
-    // add database sync here 
+    await this.chatService.addMessageToRoom(payload.room, username, payload.message, 'user');
+    // add database sync here
     this.server.to(payload.room).emit('roomMessage', { sender: username, message: payload.message });
   }
 }

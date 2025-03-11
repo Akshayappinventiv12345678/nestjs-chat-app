@@ -5,15 +5,20 @@ import {
   InternalServerErrorException,
   UnauthorizedException,
 } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { InjectConnection, InjectModel } from '@nestjs/mongoose';
+import { Connection, Model } from 'mongoose';
 import { User } from '../schemas/users.schema';
 import { JwtService } from '@nestjs/jwt';
+import { RoomInfo } from 'src/schemas/roominfo.schema';
+import { RoomInfoDto } from './dto/roominfo.dto';
+
+const roomInfoCollection = 'room_metadata';
 
 @Injectable()
 export class UserService {
   constructor(
     @InjectModel(User.name) private userModel: Model<User>,
+    @InjectConnection() private readonly connection: Connection,
     private jwtService: JwtService,
   ) {}
 
@@ -30,11 +35,7 @@ export class UserService {
     }
   }
 
-  async createUser(
-    username: string,
-    password: string,
-    role: string,
-  ): Promise<User> {
+  async createUser(username: string, password: string, role: string): Promise<User> {
     try {
       const newUser = await this.userModel.create({ username, password, role });
       return newUser;
@@ -45,10 +46,7 @@ export class UserService {
     }
   }
 
-  async signIn(
-    username: string,
-    pass: string,
-  ): Promise<{ access_token: string }> {
+  async signIn(username: string, pass: string): Promise<{ access_token: string }> {
     const user = await this.findOne(username);
     if (user?.password !== pass) {
       throw new UnauthorizedException('wrong username or password');
@@ -65,6 +63,35 @@ export class UserService {
     } catch (error) {
       console.error('Error Decoding Token:', error);
       throw new InternalServerErrorException('acess token error');
+    }
+  }
+
+  async createRoom(body: RoomInfoDto) {
+    try {
+      // Collection name = room ID
+      const db = this.connection.db;
+
+      if (!db) {
+        throw new InternalServerErrorException('Database connection not available');
+      }
+
+      const ob = {
+        createdAt: new Date(),
+        lastUpdatedAt: new Date(),
+        lastMessage: null,
+        totalMessages: 0,
+      };
+
+      // Create a metadata document for the room
+      const metaCollection = db.collection(roomInfoCollection);
+      const groupinfo = Object.assign({}, ob, body);
+
+      const resp = await metaCollection.insertOne(groupinfo);
+      console.log(' created meta info ', resp, groupinfo);
+
+      return resp;
+    } catch (error) {
+      throw new InternalServerErrorException(`Error adding message: ${error}`);
     }
   }
 }

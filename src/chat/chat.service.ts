@@ -2,6 +2,8 @@ import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { InjectConnection } from '@nestjs/mongoose';
 import { Connection } from 'mongoose';
 
+const roomInfoCollection = "room_metadata";
+
 @Injectable()
 export class ChatService {
   constructor(
@@ -35,7 +37,7 @@ export class ChatService {
         console.log(`Creating new collection: ${collectionName}`);
 
         // Create a metadata document for the room
-        const metaCollection = db.collection('room_metadata');
+        const metaCollection = db.collection('roomInfoCollection');
 
         await metaCollection.insertOne({
           roomId,
@@ -46,7 +48,7 @@ export class ChatService {
         });
       } else {
         // Update metadata when a new message is added
-        const metaCollection = db.collection('room_metadata');
+        const metaCollection = db.collection(roomInfoCollection);
         await metaCollection.updateOne(
           { roomId },
           {
